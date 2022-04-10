@@ -32,7 +32,7 @@ class OWDataSamplerA(OWBaseWidget):
     @Inputs.data
     def set_data(self, dataset):
         if dataset is not None:
-            self.infoa.setText('%d instances in input dataset' % len(dataset))
+            self.infoa.setText('%d instances in input dataset' %  len(dataset))
             indices = numpy.random.permutation(len(dataset))
             indices = indices[:int(numpy.ceil(len(dataset) * 0.1))]
             sample = dataset[indices]
