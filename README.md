@@ -1,3 +1,2 @@
-# Orange: FA widget
+# Orange: Factor Analysis widget
 
-blablabla
