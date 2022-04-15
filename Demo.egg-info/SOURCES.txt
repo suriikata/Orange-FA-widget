@@ -5,8 +5,8 @@ Demo.egg-info/SOURCES.txt
 Demo.egg-info/dependency_links.txt
 Demo.egg-info/entry_points.txt
 Demo.egg-info/top_level.txt
-factor_analysis/OWDataSamplerA.py
 factor_analysis/__init__.py
 factor_analysis/factor_analysis.py
+factor_analysis/icons/FactorAnalysis.svg
 factor_analysis/icons/category.svg
 factor_analysis/icons/mywidget.svg
