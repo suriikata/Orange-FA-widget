@@ -1,6 +1,6 @@
 from setuptools import setup
 
-setup(name="Demo",
+setup(name="Demo Faktorska Analiza",
       packages=["factor_analysis"],
       package_data={"factor_analysis": ["icons/*.svg"]},
       classifiers=["Example :: Invalid"],
