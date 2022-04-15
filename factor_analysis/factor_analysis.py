@@ -9,8 +9,8 @@ from orangewidget.widget import Input, Output
 from orangewidget.utils.widgetpreview import WidgetPreview
 from orangewidget import gui
 
-class OWDataSamplerB(OWWidget):
-    name = "Data Sampler (B)"
+class OWFactorAnalysis(OWWidget):
+    name = "Factor Analysis"
     description = "Randomly selects a subset of instances from the dataset."
     icon = "icons/DataSamplerB.svg"
     priority = 20
@@ -86,3 +86,6 @@ class OWDataSamplerB(OWWidget):
     def checkCommit(self):
         if self.commitOnChange:
             self.commit()
+
+if __name__ == "__main__":
+    WidgetPreview(OWFactorAnalysis).run(Orange.data.Table("iris"))
