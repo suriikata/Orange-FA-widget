@@ -1,4 +1,4 @@
-# orange_FA
+# Orange: FA Widget
 
 ### Razvijalska navodila
 ```
