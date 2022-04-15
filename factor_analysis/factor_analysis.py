@@ -2,7 +2,7 @@ import numpy
 
 from sklearn.decomposition import FactorAnalysis
 
-import Orange.data
+from Orange.data import Table
 from Orange.widgets import settings
 from Orange.widgets.widget import OWWidget
 from orangewidget.widget import Input, Output
@@ -16,10 +16,12 @@ class OWFactorAnalysis(OWWidget):
     priority = 20
 
     class Inputs:
-        data = Input("Data", Orange.data.Table)
+        data = Input("Data", Table)
 
     class Outputs:
-        sample = Output("Sampled Data", Orange.data.Table)
+        sample = Output("Sampled Data", Table)
+
+    want_main_area = False
 
     commitOnChange = settings.Setting(0)
     n_components = settings.Setting(1)
@@ -27,13 +29,6 @@ class OWFactorAnalysis(OWWidget):
     def __init__(self):
         super().__init__()
 
-        box = gui.widgetBox(self.controlArea, "Info")
-        self.infoa = gui.widgetLabel(
-            box, "No data on input yet, waiting to get something."
-        )
-        self.infob = gui.widgetLabel(box, "")
-
-        gui.separator(self.controlArea)
         self.optionsBox = gui.widgetBox(self.controlArea, "Options")
         gui.spin(
             self.optionsBox,
@@ -58,30 +53,29 @@ class OWFactorAnalysis(OWWidget):
     def set_data(self, dataset):
         if dataset is not None:
             self.dataset = dataset
-            self.infoa.setText("%d instances in input dataset" % len(dataset))
             self.optionsBox.setDisabled(False)
             self.factor_analysis()
         else:
             self.dataset = None
             self.sample = None
             self.optionsBox.setDisabled(False)
-            self.infoa.setText("No data on input yet, waiting to get something.")
-            self.infob.setText("")
         self.commit()
 
     def factor_analysis(self):
         if self.dataset is None:
             return
 
+        # Z izbranimi n_componentami izracunaj FA na self.dataset
         result = FactorAnalysis(self.n_components).fit(self.dataset.X)
+        # Iz spremenljivke result (ki je nek razred) izlusci samo tabelo ki nas zanima
         self.components = result.components_
 
-        self.result = Orange.data.Table.from_numpy(self.dataset.domain, self.components)
-
-        self.infob.setText(f"result: {self.result}")
+        # Pretvori tabelo nazaj v Orange.data.Table
+        self.result = Table.from_numpy(self.dataset.domain, self.components)
 
 
     def commit(self):
+        # Poslji self.result v Outputs channel.
         self.Outputs.sample.send(self.result)
 
     def checkCommit(self):
@@ -89,4 +83,4 @@ class OWFactorAnalysis(OWWidget):
             self.commit()
 
 if __name__ == "__main__":
-    WidgetPreview(OWFactorAnalysis).run(Orange.data.Table("iris"))
+    WidgetPreview(OWFactorAnalysis).run(Table("iris"))
