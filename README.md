@@ -11,10 +11,10 @@ pip install -e . # Freshly squeeze the oranges
 python -m Orange.canvas # Serve the orange juice.
 ```
 
-### Git zajebancije
+### Git preprostizacije
 ```
 git status # Pokaze katere fajle sem spremenila od zadnjega commita
 git diff # Pokaze spremembe (pritiskam presledek da vidim vse, z misko skrolam gor dol, zaprem s tipko q)
 git commit -a -m 'neko sporocilo pac frend' # Naredim Commit - lokalno shranim spremembe (-a pomeni all, -m pomeni message)
-git push # Spremembe posljem v oblak.
+git push # Shranjene commite posljem v oblak.
 ```
