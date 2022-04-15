@@ -51,20 +51,14 @@ class OWFactorAnalysis(OWWidget):
 
     @Inputs.data
     def set_data(self, dataset):
-        if dataset is not None:
-            self.dataset = dataset
-            self.optionsBox.setDisabled(False)
-            self.factor_analysis()
-        else:
-            self.dataset = None
+        if dataset is None:
             self.sample = None
-            self.optionsBox.setDisabled(False)
+
+        self.dataset = dataset
+        self.optionsBox.setDisabled(False)
         self.commit()
 
     def factor_analysis(self):
-        if self.dataset is None:
-            return
-
         # Z izbranimi n_componentami izracunaj FA na self.dataset
         result = FactorAnalysis(self.n_components).fit(self.dataset.X)
         # Iz spremenljivke result (ki je nek razred) izlusci samo tabelo ki nas zanima
@@ -75,8 +69,12 @@ class OWFactorAnalysis(OWWidget):
 
 
     def commit(self):
+        if self.dataset is None:
+            self.Outputs.sample.send(None)
+        else:
+            self.factor_analysis()
         # Poslji self.result v Outputs channel.
-        self.Outputs.sample.send(self.result)
+            self.Outputs.sample.send(self.result)
 
     def checkCommit(self):
         if self.commitOnChange:
