@@ -75,6 +75,7 @@ class OWFactorAnalysis(OWWidget):
 
         result = FactorAnalysis(self.n_components).fit(self.dataset.X)
         self.components = result.components_
+
         self.result = Orange.data.Table.from_numpy(self.dataset.domain, self.components)
 
         self.infob.setText(f"result: {self.result}")

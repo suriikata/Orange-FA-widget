@@ -2,8 +2,6 @@
 build
 dist
 Orange3.egg-info
-*.egg-info
-*.egg-info/*
 Orange/version.py
 doc/build
 *.so
