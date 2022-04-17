@@ -43,7 +43,7 @@ class OWFactorAnalysis(OWWidget):
             maxv=100,
             step=1,
             label="Number of components:",
-            callback=[self.factor_analysis, self.checkCommit],
+            callback=[self.factor_analysis, self.commit.deferred],
         )
 
         gui.auto_commit(
@@ -81,7 +81,7 @@ class OWFactorAnalysis(OWWidget):
 
         self.dataset = dataset
         self.optionsBox.setDisabled(False)
-        self.commit()
+        self.commit.now()
 
     def factor_analysis(self):
         # Z izbranimi n_componentami izracunaj FA na self.dataset
@@ -92,7 +92,7 @@ class OWFactorAnalysis(OWWidget):
         # Pretvori tabelo nazaj v Orange.data.Table
         self.result = Table.from_numpy(self.dataset.domain, self.components)
 
-
+    @gui.deferred
     def commit(self):
         if self.dataset is None:
             self.Outputs.sample.send(None)
@@ -101,9 +101,6 @@ class OWFactorAnalysis(OWWidget):
         # Poslji self.result v Outputs channel.
             self.Outputs.sample.send(self.result)
 
-    def checkCommit(self):
-        if self.commitOnChange:
-            self.commit()
 
 if __name__ == "__main__":
     WidgetPreview(OWFactorAnalysis).run(Table("iris"))
