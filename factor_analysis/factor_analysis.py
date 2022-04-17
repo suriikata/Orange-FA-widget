@@ -2,6 +2,9 @@ import numpy
 
 from sklearn.decomposition import FactorAnalysis
 
+from AnyQt.QtCore import Qt
+from AnyQt.QtWidgets import QTableView
+
 from Orange.data import Table
 from Orange.widgets import settings
 from Orange.widgets.widget import OWWidget
@@ -21,14 +24,16 @@ class OWFactorAnalysis(OWWidget):
     class Outputs:
         sample = Output("Sampled Data", Table)
 
-    want_main_area = False
-
+    settingsHandler = settings.DomainContextHandler()
+    n_components = settings.ContextSetting(1)
     commitOnChange = settings.Setting(0)
-    n_components = settings.Setting(1)
+    autocommit = settings.Setting(True)
 
     def __init__(self):
         super().__init__()
+        self.dataset = None
 
+        # Control area settings
         self.optionsBox = gui.widgetBox(self.controlArea, "Options")
         gui.spin(
             self.optionsBox,
@@ -40,19 +45,39 @@ class OWFactorAnalysis(OWWidget):
             label="Number of components:",
             callback=[self.factor_analysis, self.checkCommit],
         )
-        gui.checkBox(
-            self.optionsBox, self, "commitOnChange", "Commit data on selection change"
-        )
-        gui.button(self.optionsBox, self, "Commit", callback=self.commit)
-        self.optionsBox.setDisabled(True)
+
+        gui.auto_commit(
+            self.controlArea, self, 'autocommit', 'Commit',
+            orientation=Qt.Horizontal)
 
         gui.separator(self.controlArea)
+
+        # Main area settings
+        gui.separator(self.mainArea)
+
+        box = gui.vBox(self.mainArea, box = "Eigenvalue Scores")
+        self.mainArea.setVisible(True)
+        self.left_side.setContentsMargins(0,0,0,0)
+        table = self.table_view = QTableView(self.mainArea)
+        #table.setModel(self.table_model)
+        table.setSelectionMode(QTableView.SingleSelection)
+        table.setSelectionBehavior(QTableView.SelectRows)
+        table.setItemDelegate(gui.ColoredBarItemDelegate(self, color=Qt.cyan))
+        #table.selectionModel().selectionChanged.connect(self.select_row)
+        table.setMaximumWidth(200)      #SPREMENIT
+        table.horizontalHeader().setStretchLastSection(True)
+        table.horizontalHeader().hide()
+        table.setShowGrid(False)
+        box.layout().addWidget(table)
 
 
     @Inputs.data
     def set_data(self, dataset):
+        self.closeContext()
         if dataset is None:
             self.sample = None
+        else:
+            self.openContext(dataset.domain)
 
         self.dataset = dataset
         self.optionsBox.setDisabled(False)
