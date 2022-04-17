@@ -64,7 +64,7 @@ class OWFactorAnalysis(OWWidget):
         table.setSelectionBehavior(QTableView.SelectRows)
         table.setItemDelegate(gui.ColoredBarItemDelegate(self, color=Qt.cyan))
         #table.selectionModel().selectionChanged.connect(self.select_row)
-        table.setMaximumWidth(200)      #SPREMENIT
+        table.setMaximumWidth(300)      #SPREMENIT
         table.horizontalHeader().setStretchLastSection(True)
         table.horizontalHeader().hide()
         table.setShowGrid(False)
