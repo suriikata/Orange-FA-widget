@@ -5,7 +5,7 @@ from sklearn.decomposition import FactorAnalysis
 from AnyQt.QtCore import Qt
 from AnyQt.QtWidgets import QTableView
 
-from Orange.data import Table
+from Orange.data import Table, Domain
 from Orange.widgets import settings
 from Orange.widgets.widget import OWWidget
 from orangewidget.widget import Input, Output
@@ -90,7 +90,8 @@ class OWFactorAnalysis(OWWidget):
         self.components = result.components_
 
         # Pretvori tabelo nazaj v Orange.data.Table
-        self.result = Table.from_numpy(self.dataset.domain, self.components)
+        self.result = Table.from_numpy(Domain(self.dataset.domain.attributes),
+                                       self.components)
 
 
     def commit(self):
