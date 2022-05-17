@@ -12,6 +12,14 @@ from orangewidget.widget import Input, Output
 from orangewidget.utils.widgetpreview import WidgetPreview
 from orangewidget import gui
 
+
+class Rotation:
+    NoRotation, Varimax, Quadrimax = 0, 1, 2
+
+    @staticmethod
+    def items():
+        return ["NoRotation", "Varimax", "Quadrimax"]
+
 class OWFactorAnalysis(OWWidget):
     name = "Factor Analysis"
     description = "Randomly selects a subset of instances from the dataset."
@@ -24,39 +32,43 @@ class OWFactorAnalysis(OWWidget):
     class Outputs:
         sample = Output("Sampled Data", Table)
 
-    settingsHandler = settings.DomainContextHandler()
+    settingsHandler = settings.DomainContextHandler()   # TODO puciga
     n_components = settings.ContextSetting(1)
-    commitOnChange = settings.Setting(0)
+    fa_rotation = settings.Setting(Rotation.NoRotation)
+    commitOnChange = settings.Setting(0)        #TODO puciga
     autocommit = settings.Setting(True)
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self): # __init__ je konstruktor (prva metoda ki se klice, ko se ustvari instance tega razreda)
+        super().__init__()  # Ker je OWFactorAnalysis derivat OWWIdgeta (deduje iz OWWidgeta), najprej inicializiram njega
         self.dataset = None
 
         # Control area settings
         self.optionsBox = gui.widgetBox(self.controlArea, "Options")
         gui.spin(
-            self.optionsBox,
-            self,
-            "n_components",
-            minv=1,
-            maxv=100,
-            step=1,
-            label="Number of components:",
-            callback=[self.factor_analysis, self.commit.deferred],
+            self.optionsBox, self, "n_components", label="Number of components:",
+            minv=1, maxv=100, step=1,
+            callback=[self.factor_analysis, self.commit.deferred], #deferred = zapoznelo
+        )
+        
+        gui.comboBox(
+            self.optionsBox, self, "fa_rotation", label = "Rotation:",
+            items=Rotation.items(), orientation=Qt.Horizontal,
+            labelWidth=90, callback=self.factor_analysis
         )
 
         gui.auto_commit(
             self.controlArea, self, 'autocommit', 'Commit',
-            orientation=Qt.Horizontal)
+            orientation=Qt.Horizontal
+        )
 
-        gui.separator(self.controlArea)
+        gui.separator(self.controlArea)  # TODO tega mogoce ne potrebujem ker je to za zadnjim elementom v controlArea
 
         # Main area settings
-        gui.separator(self.mainArea)
+        self.mainArea.setVisible(True)
+
+        gui.separator(self.mainArea) # TODO tega mogoce ne potrebujem, ker je to pred prvim elementom v mainArea
 
         box = gui.vBox(self.mainArea, box = "Eigenvalue Scores")
-        self.mainArea.setVisible(True)
         self.left_side.setContentsMargins(0,0,0,0)
         table = self.table_view = QTableView(self.mainArea)
         #table.setModel(self.table_model)
@@ -64,7 +76,7 @@ class OWFactorAnalysis(OWWidget):
         table.setSelectionBehavior(QTableView.SelectRows)
         table.setItemDelegate(gui.ColoredBarItemDelegate(self, color=Qt.cyan))
         #table.selectionModel().selectionChanged.connect(self.select_row)
-        table.setMaximumWidth(300)      #SPREMENIT
+        table.setMaximumWidth(300)
         table.horizontalHeader().setStretchLastSection(True)
         table.horizontalHeader().hide()
         table.setShowGrid(False)
@@ -77,17 +89,18 @@ class OWFactorAnalysis(OWWidget):
         if dataset is None:
             self.sample = None
         else:
-            self.openContext(dataset.domain)
+            self.openContext(dataset.domain)  #Kaj je funkcija contexta
 
         self.dataset = dataset
         self.optionsBox.setDisabled(False)
-        self.commit.now()
+        self.commit.now() # Takoj poklici metodo commit
 
     def factor_analysis(self):
         # Z izbranimi n_componentami izracunaj FA na self.dataset
         result = FactorAnalysis(self.n_components).fit(self.dataset.X)
-        # Iz spremenljivke result (ki je nek razred) izlusci samo tabelo ki nas zanima
+        # Iz spremenljivke result (ki je instance nekega razreda) izlusci samo tabelo ki nas zanima
         self.components = result.components_
+        
 
         # Pretvori tabelo nazaj v Orange.data.Table
         self.result = Table.from_numpy(Domain(self.dataset.domain.attributes),
@@ -99,7 +112,7 @@ class OWFactorAnalysis(OWWidget):
             self.Outputs.sample.send(None)
         else:
             self.factor_analysis()
-        # Poslji self.result v Outputs channel.
+            # Poslji self.result v Outputs channel.
             self.Outputs.sample.send(self.result)
 
 
