@@ -14,11 +14,11 @@ from orangewidget import gui
 
 
 class Rotation:
-    NoRotation, Varimax, Quadrimax = 0, 1, 2
+    NoRotation, Varimax, Quartimax = 0, 1, 2
 
     @staticmethod
     def items():
-        return ["NoRotation", "Varimax", "Quadrimax"]
+        return ["NoRotation", "Varimax", "Quartimax"]
 
 class OWFactorAnalysis(OWWidget):
     name = "Factor Analysis"
@@ -32,16 +32,14 @@ class OWFactorAnalysis(OWWidget):
     class Outputs:
         sample = Output("Sampled Data", Table)
 
-    settingsHandler = settings.DomainContextHandler()   # TODO puciga
     n_components = settings.ContextSetting(1)
-    fa_rotation = settings.Setting(Rotation.NoRotation)
-    commitOnChange = settings.Setting(0)        #TODO puciga
+    setting_for_rotation = settings.Setting(Rotation.NoRotation)
     autocommit = settings.Setting(True)
-
+    
     def __init__(self): # __init__ je konstruktor (prva metoda ki se klice, ko se ustvari instance tega razreda)
         super().__init__()  # Ker je OWFactorAnalysis derivat OWWIdgeta (deduje iz OWWidgeta), najprej inicializiram njega
         self.dataset = None
-
+       
         # Control area settings
         self.optionsBox = gui.widgetBox(self.controlArea, "Options")
         gui.spin(
@@ -51,7 +49,7 @@ class OWFactorAnalysis(OWWidget):
         )
         
         gui.comboBox(
-            self.optionsBox, self, "fa_rotation", label = "Rotation:",
+            self.optionsBox, self, "setting_for_rotation", label = "Rotation:",
             items=Rotation.items(), orientation=Qt.Horizontal,
             labelWidth=90, callback=self.factor_analysis
         )
@@ -96,15 +94,22 @@ class OWFactorAnalysis(OWWidget):
         self.commit.now() # Takoj poklici metodo commit
 
     def factor_analysis(self):
-        # Z izbranimi n_componentami izracunaj FA na self.dataset
-        result = FactorAnalysis(self.n_components).fit(self.dataset.X)
-        # Iz spremenljivke result (ki je instance nekega razreda) izlusci samo tabelo ki nas zanima
-        self.components = result.components_
-        
+        # Z izbranimi n_componentami in v odvisnosti od uporabnisko izbrane rotacije, izracunaj FA na self.dataset
+        if self.setting_for_rotation == 0:
+            result = FactorAnalysis(self.n_components).fit(self.dataset.X)
+        elif self.setting_for_rotation == 1:
+            result = FactorAnalysis(self.n_components, rotation="varimax").fit(self.dataset.X)
+        elif self.setting_for_rotation == 2:
+            result = FactorAnalysis(self.n_components, rotation="quartimax").fit(self.dataset.X)
+        else:
+            print("Error: To pa ne bi smelo zgoditi tako")
+    
+        # Iz spremenljivke result (ki je instanca nekega razreda) izlusci samo tabelo, ki nas zanima (komponente)
+        calculated_components = result.components_
 
         # Pretvori tabelo nazaj v Orange.data.Table
         self.result = Table.from_numpy(Domain(self.dataset.domain.attributes),
-                                       self.components)
+                                       calculated_components)
 
     @gui.deferred
     def commit(self):
