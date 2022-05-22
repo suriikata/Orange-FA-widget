@@ -10,6 +10,7 @@ from Orange.widgets import settings
 from Orange.widgets.widget import OWWidget
 from orangewidget.widget import Input, Output
 from orangewidget.utils.widgetpreview import WidgetPreview
+from Orange.widgets.utils.slidergraph import SliderGraph
 from orangewidget import gui
 
 
@@ -58,7 +59,6 @@ class OWFactorAnalysis(OWWidget):
             self.controlArea, self, 'autocommit', 'Commit',
             orientation=Qt.Horizontal
         )
-
         gui.separator(self.controlArea)  # TODO tega mogoce ne potrebujem ker je to za zadnjim elementom v controlArea
 
         # Main area settings
@@ -66,6 +66,27 @@ class OWFactorAnalysis(OWWidget):
 
         gui.separator(self.mainArea) # TODO tega mogoce ne potrebujem, ker je to pred prvim elementom v mainArea
 
+        self.plot = SliderGraph("Factor 1", "Factor 2", self.prazna_funkcija)
+
+        self.mainArea.layout().addWidget(self.plot)
+
+    def prazna_funkcija(self): #zato ker _init_ Slidergrapha zahteva "callback"
+        pass
+
+    def setup_plot(self):
+        if self.n_components == 1:
+            return
+
+        self.factor1 = self.result.X[0]
+        self.factor2 = [self.result.X[1]]
+
+        self.plot.setRange(xRange=(-10.0, 10.0), yRange=(-10.0, 10.0))
+
+        print(self.factor1)
+
+        self.plot.update(x = self.factor1, y = self.factor2, colors = [Qt.red])
+
+        """ TABELA TODO: factor loadings po rotaciji 
         box = gui.vBox(self.mainArea, box = "Eigenvalue Scores")
         self.left_side.setContentsMargins(0,0,0,0)
         table = self.table_view = QTableView(self.mainArea)
@@ -79,15 +100,17 @@ class OWFactorAnalysis(OWWidget):
         table.horizontalHeader().hide()
         table.setShowGrid(False)
         box.layout().addWidget(table)
+        """
 
 
     @Inputs.data
     def set_data(self, dataset):
-        self.closeContext()
+        #self.closeContext()
         if dataset is None:
             self.sample = None
         else:
-            self.openContext(dataset.domain)  #Kaj je funkcija contexta
+            #self.openContext(dataset.domain)  #Kaj je funkcija contexta
+            pass
 
         self.dataset = dataset
         self.optionsBox.setDisabled(False)
@@ -111,6 +134,8 @@ class OWFactorAnalysis(OWWidget):
         self.result = Table.from_numpy(Domain(self.dataset.domain.attributes),
                                        calculated_components)
 
+
+
     @gui.deferred
     def commit(self):
         if self.dataset is None:
@@ -119,6 +144,7 @@ class OWFactorAnalysis(OWWidget):
             self.factor_analysis()
             # Poslji self.result v Outputs channel.
             self.Outputs.sample.send(self.result)
+            self.setup_plot()
 
 
 if __name__ == "__main__":

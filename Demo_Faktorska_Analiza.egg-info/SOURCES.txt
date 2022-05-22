@@ -7,6 +7,7 @@ Demo_Faktorska_Analiza.egg-info/entry_points.txt
 Demo_Faktorska_Analiza.egg-info/top_level.txt
 factor_analysis/__init__.py
 factor_analysis/factor_analysis.py
+factor_analysis/owpca.py
 factor_analysis/icons/FactorAnalysis.svg
 factor_analysis/icons/category.svg
 factor_analysis/icons/mywidget.svg
