@@ -1,4 +1,4 @@
-import numpy
+import numpy as np
 
 from sklearn.decomposition import FactorAnalysis
 
@@ -12,6 +12,9 @@ from orangewidget.widget import Input, Output
 from orangewidget.utils.widgetpreview import WidgetPreview
 from Orange.widgets.utils.slidergraph import SliderGraph
 from orangewidget import gui
+
+from pyqtgraph import mkPen, TextItem
+from AnyQt.QtGui import QColor
 
 
 class Rotation:
@@ -78,13 +81,32 @@ class OWFactorAnalysis(OWWidget):
             return
 
         self.factor1 = self.result.X[0]
-        self.factor2 = [self.result.X[1]]
+        self.factor2 = self.result.X[1]
 
-        self.plot.setRange(xRange=(-10.0, 10.0), yRange=(-10.0, 10.0))
+        self.plot.setRange(xRange=(-1.0, 1.0), yRange=(-1.0, 1.0))
 
-        print(self.factor1)
+        c = QColor(Qt.red)
 
-        self.plot.update(x = self.factor1, y = self.factor2, colors = [Qt.red])
+
+        foreground = self.plot.palette().text().color()
+        foreground.setAlpha(128)
+
+        names = []
+        for i in range(len(self.factor1)):
+            name = f"atribut-{i}"
+            names.append(name)
+
+        for x, y, n in zip(self.factor1, self.factor2, names):
+            x_vektor, y_vektor = [0, x], [0, y]
+            self.plot.plot(x_vektor, y_vektor, pen=mkPen(c, width=1), antialias=True)
+
+            if n is not None:
+                label = TextItem(
+                    text=n, anchor=(0, 1), color=foreground)
+                label.setPos(x_vektor[-1], y_vektor[-1])
+                self.plot.x = x_vektor
+                self.plot._set_anchor(label, len(x_vektor) - 1, True)
+                self.plot.addItem(label)
 
         """ TABELA TODO: factor loadings po rotaciji 
         box = gui.vBox(self.mainArea, box = "Eigenvalue Scores")
