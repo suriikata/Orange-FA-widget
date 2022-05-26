@@ -16,6 +16,14 @@ from orangewidget import gui
 from pyqtgraph import mkPen, TextItem
 from AnyQt.QtGui import QColor
 
+"""
+TVORNICA IZBOLJŠAV:
+    i. dodati zoom; 
+    ii. definirati errorje;
+    iii. najti oblimin funkcijo;
+    iv. kako zasnovati graf z več kot dvema faktorjema;
+    v. zavihki: factor loadings and/or communalities.
+"""
 
 class Rotation:
     NoRotation, Varimax, Quartimax = 0, 1, 2
@@ -76,29 +84,52 @@ class OWFactorAnalysis(OWWidget):
     def prazna_funkcija(self): #zato ker _init_ Slidergrapha zahteva "callback"
         pass
 
+    def get_range(self, factor):
+        max_value = factor[0]
+        for i in range(len(factor)):
+            if factor[i] > max_value:
+                max_value = factor[i]
+
+        min_value = factor[0]
+        for i in range(len(factor)):
+            if factor[i] < min_value:
+                min_value = factor[i]
+
+        # prilagodi in skaliraj za 0.1
+        min_value = min_value - 0.1 * abs(min_value)
+        max_value = max_value + 0.1 * abs(max_value)
+
+        # returnaj po absolutni vrednost najvecjega
+        return max(abs(min_value), abs(max_value))
+
+    def set_range(self):
+        factor1_range = self.get_range(self.factor1)
+        factor2_range = self.get_range(self.factor2)
+        self.plot.setRange(xRange=(-factor1_range, factor1_range), yRange=(-factor2_range, factor2_range))
+
+
     def setup_plot(self):
+        self.plot.clear_plot()
         if self.n_components == 1:
             return
 
         self.factor1 = self.result.X[0]
         self.factor2 = self.result.X[1]
 
-        self.plot.setRange(xRange=(-1.0, 1.0), yRange=(-1.0, 1.0))
-
-        c = QColor(Qt.red)
-
+        self.set_range()
 
         foreground = self.plot.palette().text().color()
         foreground.setAlpha(128)
 
         names = []
-        for i in range(len(self.factor1)):
-            name = f"atribut-{i}"
+        for i in range(len(self.dataset.domain.attributes)):
+            name = self.dataset.domain.attributes[i].name
             names.append(name)
+
 
         for x, y, n in zip(self.factor1, self.factor2, names):
             x_vektor, y_vektor = [0, x], [0, y]
-            self.plot.plot(x_vektor, y_vektor, pen=mkPen(c, width=1), antialias=True)
+            self.plot.plot(x_vektor, y_vektor, pen=mkPen(QColor(Qt.red) , width=1), antialias=True)
 
             if n is not None:
                 label = TextItem(
