@@ -18,11 +18,13 @@ from AnyQt.QtGui import QColor
 
 """
 TVORNICA IZBOLJŠAV:
-    i. dodati zoom; 
-    ii. definirati errorje;
-    iii. najti oblimin funkcijo;
-    iv. kako zasnovati graf z več kot dvema faktorjema;
-    v. zavihki: factor loadings and/or communalities.
+    i. prestaviti option razdelek na vrh; 
+    ii. correlation matrix z radiobutonni (OW Continuize) + prikazati na grafu;
+    iii. najti oblimin funkcijo(!);
+    iv. obarvati in poudariti pomembne variable;
+    v. definirati errorje;
+    vi. izhajati iz plotutils namesto slidergrapha razreda;
+    vii. input data: fa na sparse matrix.
 """
 
 class Rotation:
@@ -48,40 +50,37 @@ class OWFactorAnalysis(OWWidget):
     setting_for_rotation = settings.Setting(Rotation.NoRotation)
     autocommit = settings.Setting(True)
     
-    def __init__(self): # __init__ je konstruktor (prva metoda ki se klice, ko se ustvari instance tega razreda)
-        super().__init__()  # Ker je OWFactorAnalysis derivat OWWIdgeta (deduje iz OWWidgeta), najprej inicializiram njega
+    def __init__(self):
+        super().__init__()  # since OWFactorAnalysis is a derivative of OWWidget, first intialize OWFA
         self.dataset = None
-       
-        # Control area settings
-        self.optionsBox = gui.widgetBox(self.controlArea, "Options")
-        gui.spin(
-            self.optionsBox, self, "n_components", label="Number of components:",
-            minv=1, maxv=100, step=1,
-            callback=[self.factor_analysis, self.commit.deferred], #deferred = zapoznelo
-        )
-        
-        gui.comboBox(
-            self.optionsBox, self, "setting_for_rotation", label = "Rotation:",
-            items=Rotation.items(), orientation=Qt.Horizontal,
-            labelWidth=90, callback=self.factor_analysis
-        )
-
-        gui.auto_commit(
-            self.controlArea, self, 'autocommit', 'Commit',
-            orientation=Qt.Horizontal
-        )
-        gui.separator(self.controlArea)  # TODO tega mogoce ne potrebujem ker je to za zadnjim elementom v controlArea
 
         # Main area settings
         self.mainArea.setVisible(True)
 
-        gui.separator(self.mainArea) # TODO tega mogoce ne potrebujem, ker je to pred prvim elementom v mainArea
+        self.attr_box = gui.hBox(self.mainArea, margin=0)
+        
+        gui.spin(
+            self.attr_box, self, "n_components", label="Number of components:",
+            minv=1, maxv=100, step=1, controlWidth=30, 
+            callback=[self.factor_analysis, self.commit.deferred],  # deferred = zapoznelo
+        )
+        
+        gui.comboBox(
+            self.attr_box, self, "setting_for_rotation", label="Rotation:", labelWidth=50,
+            items=Rotation.items(), orientation=Qt.Horizontal, 
+            contentsLength=12, callback=self.factor_analysis
+        )
+
+        gui.auto_commit(
+            self.attr_box, self, 'autocommit', 'Commit',
+            orientation=Qt.Horizontal
+        )
+        gui.separator(self.mainArea) # do i need it? >>> the first element in mainArea
 
         self.plot = SliderGraph("Factor 1", "Factor 2", self.prazna_funkcija)
-
         self.mainArea.layout().addWidget(self.plot)
 
-    def prazna_funkcija(self): #zato ker _init_ Slidergrapha zahteva "callback"
+    def prazna_funkcija(self): # bc _init_ Slidergrapha requires "callback"
         pass
 
     def get_range(self, factor):
@@ -95,11 +94,11 @@ class OWFactorAnalysis(OWWidget):
             if factor[i] < min_value:
                 min_value = factor[i]
 
-        # prilagodi in skaliraj za 0.1
+        # adjust and scale by 0.1
         min_value = min_value - 0.1 * abs(min_value)
         max_value = max_value + 0.1 * abs(max_value)
 
-        # returnaj po absolutni vrednost najvecjega
+        # return the abs value of maximum
         return max(abs(min_value), abs(max_value))
 
     def set_range(self):
@@ -125,7 +124,6 @@ class OWFactorAnalysis(OWWidget):
         for i in range(len(self.dataset.domain.attributes)):
             name = self.dataset.domain.attributes[i].name
             names.append(name)
-
 
         for x, y, n in zip(self.factor1, self.factor2, names):
             x_vektor, y_vektor = [0, x], [0, y]
@@ -155,22 +153,20 @@ class OWFactorAnalysis(OWWidget):
         box.layout().addWidget(table)
         """
 
-
     @Inputs.data
     def set_data(self, dataset):
         #self.closeContext()
         if dataset is None:
             self.sample = None
         else:
-            #self.openContext(dataset.domain)  #Kaj je funkcija contexta
+            #self.openContext(dataset.domain)  # what is the function of context?
             pass
 
         self.dataset = dataset
-        self.optionsBox.setDisabled(False)
-        self.commit.now() # Takoj poklici metodo commit
+        self.commit.now()
 
     def factor_analysis(self):
-        # Z izbranimi n_componentami in v odvisnosti od uporabnisko izbrane rotacije, izracunaj FA na self.dataset
+        # with chosen n_components and depending on the user-selected rotation, calculate the FA on self.dataset
         if self.setting_for_rotation == 0:
             result = FactorAnalysis(self.n_components).fit(self.dataset.X)
         elif self.setting_for_rotation == 1:
@@ -178,15 +174,14 @@ class OWFactorAnalysis(OWWidget):
         elif self.setting_for_rotation == 2:
             result = FactorAnalysis(self.n_components, rotation="quartimax").fit(self.dataset.X)
         else:
-            print("Error: To pa ne bi smelo zgoditi tako")
+            print("Error:")
     
-        # Iz spremenljivke result (ki je instanca nekega razreda) izlusci samo tabelo, ki nas zanima (komponente)
+        # from result variable (instance of class) only extract the table we are interested in (components)
         calculated_components = result.components_
 
-        # Pretvori tabelo nazaj v Orange.data.Table
+        # transform the table back to Orange.data.Table
         self.result = Table.from_numpy(Domain(self.dataset.domain.attributes),
                                        calculated_components)
-
 
 
     @gui.deferred
@@ -195,7 +190,7 @@ class OWFactorAnalysis(OWWidget):
             self.Outputs.sample.send(None)
         else:
             self.factor_analysis()
-            # Poslji self.result v Outputs channel.
+            # send self.result in Outputs channel
             self.Outputs.sample.send(self.result)
             self.setup_plot()
 
