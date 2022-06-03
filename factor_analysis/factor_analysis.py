@@ -3,7 +3,8 @@ import numpy as np
 from sklearn.decomposition import FactorAnalysis
 
 from AnyQt.QtCore import Qt
-from AnyQt.QtWidgets import QTableView
+from AnyQt.QtGui import QColor, QBrush, QStandardItemModel, QStandardItem
+from AnyQt.QtWidgets import QTableView, QSizePolicy
 
 from Orange.data import Table, Domain
 from Orange.widgets import settings
@@ -14,7 +15,8 @@ from Orange.widgets.utils.slidergraph import SliderGraph
 from orangewidget import gui
 
 from pyqtgraph import mkPen, TextItem
-from AnyQt.QtGui import QColor
+
+
 
 """
 TVORNICA IZBOLJŠAV:
@@ -26,6 +28,7 @@ TVORNICA IZBOLJŠAV:
     vi. izhajati iz plotutils namesto slidergrapha razreda;
     vii. input data: fa na sparse matrix.
 """
+BorderRole = next(gui.OrangeUserRole)
 
 class Rotation:
     NoRotation, Varimax, Quartimax = 0, 1, 2
@@ -77,8 +80,47 @@ class OWFactorAnalysis(OWWidget):
         )
         gui.separator(self.mainArea) # do i need it? >>> the first element in mainArea
 
+        box = gui.vBox(self.mainArea, box = "Factor Loadings")
+        
+        self.tablemodel = QStandardItemModel(self)
+        view = self.tableview = QTableView(
+            editTriggers=QTableView.NoEditTriggers)
+        view.setModel(self.tablemodel)
+        view.horizontalHeader().hide()
+        view.verticalHeader().hide()
+        view.horizontalHeader().setMinimumSectionSize(60)
+        #view.selectionModel().selectionChanged.connect(self._invalidate)
+        view.setShowGrid(False)
+        #view.setItemDelegate(BorderedItemDelegate(Qt.white))
+        view.setSizePolicy(QSizePolicy.MinimumExpanding,
+                           QSizePolicy.MinimumExpanding)
+        # view.clicked.connect(self.cell_clicked)
+        box.layout().addWidget(view)
+
         self.plot = SliderGraph("Factor 1", "Factor 2", self.prazna_funkcija)
         self.mainArea.layout().addWidget(self.plot)
+
+    def _set_item(self, i, j, item):
+        self.tablemodel.setItem(i, j, item)
+
+    def insert_table(self):
+        for i in range(len(self.result.X)): #i = rows = factors
+            for j in range(len(self.result.X[0])):  #j = columns = variables
+                val = self.result.X[i][j] #from i-row and j-column we had a specific variable value
+                #col_val = colors[i, j] #colored it by the relevance, at some point
+                item = QStandardItem()  #what is QStandardItem??
+                item.setData(val, Qt.DisplayRole) #set our val into item
+                bkcolor = QColor.fromHsl([0, 240][i == j], 160, 255)
+                item.setData(QBrush(bkcolor), Qt.BackgroundRole)
+                # bkcolor is light-ish so use a black text
+                item.setData(QBrush(Qt.black), Qt.ForegroundRole)
+                item.setData("trbl", BorderRole)
+                #item.setToolTip("actual: {}\npredicted: {}".format(
+                    #self.headers[i], self.headers[j]))
+                item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+                self._set_item(i + 2, j + 2, item) #insert newly created item into self.tablemodel
+
 
     def prazna_funkcija(self): # bc _init_ Slidergrapha requires "callback"
         pass
@@ -136,17 +178,18 @@ class OWFactorAnalysis(OWWidget):
                 self.plot.x = x_vektor
                 self.plot._set_anchor(label, len(x_vektor) - 1, True)
                 self.plot.addItem(label)
-
-        """ TABELA TODO: factor loadings po rotaciji 
-        box = gui.vBox(self.mainArea, box = "Eigenvalue Scores")
-        self.left_side.setContentsMargins(0,0,0,0)
+        
+        """
+        #TABELA TODO: factor loadings po rotaciji 
+        box = gui.vBox(self.mainArea, box = "Factor Loadings")
+        #self.left_side.setContentsMargins(0,0,0,0)
         table = self.table_view = QTableView(self.mainArea)
-        #table.setModel(self.table_model)
-        table.setSelectionMode(QTableView.SingleSelection)
-        table.setSelectionBehavior(QTableView.SelectRows)
-        table.setItemDelegate(gui.ColoredBarItemDelegate(self, color=Qt.cyan))
+        #table.setModel(self.table_model) ??? factorsko vnest
+        #table.setSelectionMode(QTableView.SingleSelection)
+        #table.setSelectionBehavior(QTableView.SelectRows)
+        #table.setItemDelegate(gui.ColoredBarItemDelegate(self, color=Qt.cyan))
         #table.selectionModel().selectionChanged.connect(self.select_row)
-        table.setMaximumWidth(300)
+        #table.setMaximumWidth(300)
         table.horizontalHeader().setStretchLastSection(True)
         table.horizontalHeader().hide()
         table.setShowGrid(False)
@@ -183,7 +226,6 @@ class OWFactorAnalysis(OWWidget):
         self.result = Table.from_numpy(Domain(self.dataset.domain.attributes),
                                        calculated_components)
 
-
     @gui.deferred
     def commit(self):
         if self.dataset is None:
@@ -192,7 +234,9 @@ class OWFactorAnalysis(OWWidget):
             self.factor_analysis()
             # send self.result in Outputs channel
             self.Outputs.sample.send(self.result)
+            self.insert_table()
             self.setup_plot()
+
 
 
 if __name__ == "__main__":
