@@ -7,6 +7,7 @@ from AnyQt.QtGui import QColor, QBrush, QStandardItemModel, QStandardItem
 from AnyQt.QtWidgets import QTableView, QSizePolicy
 
 from Orange.data import Table, Domain
+from Orange.data.util import get_unique_names
 from Orange.widgets import settings
 from Orange.widgets.widget import OWWidget
 from orangewidget.widget import Input, Output
@@ -14,13 +15,15 @@ from orangewidget.utils.widgetpreview import WidgetPreview
 from Orange.widgets.utils.slidergraph import SliderGraph
 from orangewidget import gui
 
+
+
 from pyqtgraph import mkPen, TextItem
 
 
 
 """
 TVORNICA IZBOLJŠAV:
-    i. prestaviti option razdelek na vrh; 
+    i. aplicirati rotation funkcijo >>>> vrednosti se ne spremenijo; 
     ii. correlation matrix z radiobutonni (OW Continuize) + prikazati na grafu;
     iii. najti oblimin funkcijo(!);
     iv. obarvati in poudariti pomembne variable;
@@ -90,7 +93,7 @@ class OWFactorAnalysis(OWWidget):
         view.verticalHeader().hide()
         view.horizontalHeader().setMinimumSectionSize(60)
         #view.selectionModel().selectionChanged.connect(self._invalidate)
-        view.setShowGrid(False)
+        view.setShowGrid(True)
         #view.setItemDelegate(BorderedItemDelegate(Qt.white))
         view.setSizePolicy(QSizePolicy.MinimumExpanding,
                            QSizePolicy.MinimumExpanding)
@@ -100,27 +103,42 @@ class OWFactorAnalysis(OWWidget):
         self.plot = SliderGraph("Factor 1", "Factor 2", self.prazna_funkcija)
         self.mainArea.layout().addWidget(self.plot)
 
-    def _set_item(self, i, j, item):
+    def insert_item(self, i, j, val):
+        """
+        insert item into row i and column j
+        """
+        # col_val = colors[i, j]        #colored it by the relevance, at some point
+        item = QStandardItem()          # what is QStandardItem??
+        bkcolor = QColor.fromHsl([0, 240][i == j], 160, 255)
+        item.setData(QBrush(bkcolor), Qt.BackgroundRole)
+        # bkcolor is light-ish so use a black text
+        item.setData(QBrush(Qt.black), Qt.ForegroundRole)
+        item.setData("trbl", BorderRole)
+        # item.setToolTip("actual: {}\npredicted: {}".format(
+        # self.headers[i], self.headers[j]))
+        item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+
+        if type(val) != str:
+            val = str(round(val, 2))
+
+        item.setData(val, Qt.DisplayRole)          # set our val into item
         self.tablemodel.setItem(i, j, item)
 
     def insert_table(self):
-        for i in range(len(self.result.X)): #i = rows = factors
-            for j in range(len(self.result.X[0])):  #j = columns = variables
-                val = self.result.X[i][j] #from i-row and j-column we had a specific variable value
-                #col_val = colors[i, j] #colored it by the relevance, at some point
-                item = QStandardItem()  #what is QStandardItem??
-                item.setData(val, Qt.DisplayRole) #set our val into item
-                bkcolor = QColor.fromHsl([0, 240][i == j], 160, 255)
-                item.setData(QBrush(bkcolor), Qt.BackgroundRole)
-                # bkcolor is light-ish so use a black text
-                item.setData(QBrush(Qt.black), Qt.ForegroundRole)
-                item.setData("trbl", BorderRole)
-                #item.setToolTip("actual: {}\npredicted: {}".format(
-                    #self.headers[i], self.headers[j]))
-                item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-                self._set_item(i + 2, j + 2, item) #insert newly created item into self.tablemodel
+        #insert variable names into first row (0)
+        for j in range(len(self.dataset.domain.attributes)):
+            name = self.dataset.domain.attributes[j].name
+            self.insert_item(0, j + 1, name)        #in order to get the first cell in column > increase j for 1
 
+        for i in range(self.n_components):
+            name = f"Factor {i + 1}"
+            self.insert_item(i + 1, 0, name)        #in order to get the first cell in row > increase i for 1
+
+        for i in range(len(self.result.X)):         #i = rows = factors
+            for j in range(len(self.result.X[0])):  #j = columns = variables
+                val = self.result.X[i][j]           #from i-row and j-column we had a specific variable value
+                self.insert_item(i + 1, j + 1, val)     #insert into rows and column from 1 onwards, because everything is full of names
 
     def prazna_funkcija(self): # bc _init_ Slidergrapha requires "callback"
         pass
@@ -223,8 +241,8 @@ class OWFactorAnalysis(OWWidget):
         calculated_components = result.components_
 
         # transform the table back to Orange.data.Table
-        self.result = Table.from_numpy(Domain(self.dataset.domain.attributes),
-                                       calculated_components)
+        self.result = Table.from_numpy(Domain(self.dataset.domain.attributes), 
+                                      calculated_components)
 
     @gui.deferred
     def commit(self):
