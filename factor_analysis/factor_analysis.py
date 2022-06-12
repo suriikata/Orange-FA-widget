@@ -20,9 +20,9 @@ from pyqtgraph import mkPen, TextItem
 
 """
 TVORNICA IZBOLJŠAV:
-    i. aplicirati rotation funkcijo >>>> vrednosti se ne spremenijo; 
+    i. aplicirati rotation funkcijo >>>> vrednosti se spremenijo le z COMMITOM; 
     ii. correlation matrix z radiobutonni (OW Continuize) + prikazati na grafu;
-    iii. najti oblimin funkcijo(!);
+    iii. kot zmanjšamo število komponent te v tabeli ne izginejo;
     iv. obarvati in poudariti pomembne variable;
     v. definirati errorje;
     vi. izhajati iz plotutils namesto slidergrapha razreda;
@@ -197,23 +197,23 @@ class OWFactorAnalysis(OWWidget):
 
         # from result variable (instance of FactorAnalyzer class) only extract the loadings
         loadings = fit_result.loadings_
+        
+        print(f"loadings: {loadings}")
 
         # transform loadings in listicic
-        loadings_list = []
-        for x in loadings:
-            loadings_list.append(x[0])
-
-        loadings_list = np.asarray(loadings_list) # transform into nupmy array (maybe not necessry)
-        print(f"len: {len(loadings_list)}, list of loadings: {loadings_list}")
+        mega_loadings_list = []
+        for i in range(self.n_components):
+            loadings_list = []
+            for x in loadings:
+                loadings_list.append(x[i])
+            mega_loadings_list.append(loadings_list)
 
         # from result variable (instance of FactorAnalyzer class) get the eigenvalues
         eigen_values = fit_result.get_eigenvalues()
 
     
        # transform the table back to Orange.data.Table
-        print(f": X shape 1: {self.dataset.X[1]} <--> {len(self.dataset.domain.attributes)} domain attributes")
-
-        self.fa_loadings = Table.from_numpy(Domain(self.dataset.domain.attributes), loadings_list)
+        self.fa_loadings = Table.from_numpy(Domain(self.dataset.domain.attributes), mega_loadings_list)
 
     @gui.deferred
     def commit(self):
