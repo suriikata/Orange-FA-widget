@@ -56,10 +56,9 @@ class OWFactorAnalysis(OWWidget):
     autocommit = settings.Setting(True)
     
     def __init__(self):
-        self.dataset = None
-        self.attributes = None
-        self.fa_loadings = None
-        self.header = []
+        self.dataset = None     # this contains the input dataset.
+        self.attributes = []    # this contains the list of attribute (variable) names.
+        self.fa_loadings = None # this contains factorial values after rotation was applied.
 
         # Main area settings
         self.attr_box = gui.hBox(self.mainArea, margin=0)
@@ -84,9 +83,9 @@ class OWFactorAnalysis(OWWidget):
         gui.separator(self.mainArea)
 
         box = gui.vBox(self.mainArea, box = "Factor Loadings")
-        
+
+        # Table
         self.tablemodel = QStandardItemModel(self)
-        self.tablemodel.setHorizontalHeaderLabels(self.header)
         view = self.tableview = QTableView(
             editTriggers=QTableView.NoEditTriggers)
         view.setModel(self.tablemodel)
@@ -101,6 +100,7 @@ class OWFactorAnalysis(OWWidget):
         # view.clicked.connect(self.cell_clicked)
         box.layout().addWidget(view)
 
+        # Graph
         self.plot = SliderGraph("Factor 1", "Factor 2", lambda x: None)
         self.mainArea.layout().addWidget(self.plot)
 
@@ -108,12 +108,20 @@ class OWFactorAnalysis(OWWidget):
         self.factor_analysis()
         self.commit.deferred()
 
+    @Inputs.data
+    def set_data(self, dataset):
+        self.dataset = dataset
+
+        # Extract list of attribute (variables) names from the self.dataset.domain.attributes
+        self.attributes = []
+        for j in range(len(self.dataset.domain.attributes)):
+            self.attributes.append(self.dataset.domain.attributes[j].name)
+        self.commit.now()
+
+    # insert item into row i and column j of the table.
     def insert_item(self, i, j, val):
-        """
-        insert item into row i and column j
-        """
-        # col_val = colors[i, j]        #colored it by the relevance, at some point
-        item = QStandardItem()          # what is QStandardItem??
+        # col_val = colors[i, j]                # at some point, color it by the relevance
+        item = QStandardItem()
         bkcolor = QColor.fromHsl([0, 240][i == j], 160, 255)
         item.setData(QBrush(bkcolor), Qt.BackgroundRole)
         # bkcolor is light-ish so use a black text
@@ -130,24 +138,20 @@ class OWFactorAnalysis(OWWidget):
         item.setData(val, Qt.DisplayRole)          # set our val into item
         self.tablemodel.setItem(i, j, item)
 
+    #set up the table which will be shown in the Main Area.
     def insert_table(self):
-        #insert variable names into first row (0)
-        for j in range(len(self.attributes)):
-            self.header.append(self.attributes[j].name)
+        #insert attribute (variable) names into horizontal header
+        self.tablemodel.setHorizontalHeaderLabels(self.attributes)
 
-        self.tablemodel.setHorizontalHeaderLabels(self.header)
-        self.header = []
+        # TODO insert radiobox buttons
 
+        #TODO insert eigen values
+
+        #insert values into the table
         for i in range(len(self.fa_loadings.X)):         #i = rows = factors
             for j in range(len(self.fa_loadings.X[0])):  #j = columns = variables
                 val = self.fa_loadings.X[i][j]           #from i-row and j-column we had a specific variable value
                 self.insert_item(i, j, val)      #insert into rows and column from 1 onwards, because everything is full of names
-
-
-    def set_range(self):
-        factor1_range = np.max(1.1 * np.abs(self.factor1))  #function to remember > the largest abs value * 1.1 of factor
-        factor2_range = np.max(1.1 * np.abs(self.factor2))
-        self.plot.setRange(xRange=(-factor1_range, factor1_range), yRange=(-factor2_range, factor2_range))
 
 
     def setup_plot(self):
@@ -155,48 +159,34 @@ class OWFactorAnalysis(OWWidget):
         if self.n_components == 1:
             return
 
+        #get first 2 factors to show on the graph
         self.factor1 = self.fa_loadings.X[0]
         self.factor2 = self.fa_loadings.X[1]
 
-        self.set_range()
+        #gset the range
+        self.set_range_graph()
 
         foreground = self.plot.palette().text().color()
         foreground.setAlpha(128)
 
-        for x, y, attr in zip(self.factor1, self.factor2, self.attributes):
+        #draw the variable vectors and their names into the graph
+        for x, y, attr_name in zip(self.factor1, self.factor2, self.attributes):
             x_vector, y_vector = [0, x], [0, y]
             self.plot.plot(x_vector, y_vector,
                 pen=mkPen(QColor(Qt.red), width=1), antialias=True,
             )
 
-            label = TextItem(text=attr.name, anchor=(0, 1), color=foreground)
+            label = TextItem(text=attr_name, anchor=(0, 1), color=foreground)
             label.setPos(x_vector[-1], y_vector[-1])
             self.plot.x = x_vector
             self.plot._set_anchor(label, len(x_vector) - 1, True)
             self.plot.addItem(label)
-        
-        """
-        #TABELA TODO: factor loadings po rotaciji 
-        box = gui.vBox(self.mainArea, box = "Factor Loadings")
-        #self.left_side.setContentsMargins(0,0,0,0)
-        table = self.table_view = QTableView(self.mainArea)
-        #table.setModel(self.table_model) ??? faktorsko vnest
-        #table.setSelectionMode(QTableView.SingleSelection)
-        #table.setSelectionBehavior(QTableView.SelectRows)
-        #table.setItemDelegate(gui.ColoredBarItemDelegate(self, color=Qt.cyan))
-        #table.selectionModel().selectionChanged.connect(self.select_row)
-        #table.setMaximumWidth(300)
-        table.horizontalHeader().setStretchLastSection(True)
-        table.horizontalHeader().hide()
-        table.setShowGrid(False)
-        box.layout().addWidget(table)
-        """
+            # set range (scale) of the shown graph
 
-    @Inputs.data
-    def set_data(self, dataset):
-        self.dataset = dataset
-        self.attributes = self.dataset.domain.attributes
-        self.commit.now()
+    def set_range_graph(self):
+        factor1_range = np.max(1.1 * np.abs(self.factor1))  # function to remember > the largest abs value * 1.1 of factor
+        factor2_range = np.max(1.1 * np.abs(self.factor2))
+        self.plot.setRange(xRange=(-factor1_range, factor1_range), yRange=(-factor2_range, factor2_range))
 
 
     def factor_analysis(self):              #GROMOZANSKI, V OČI BODEČ HROŠČ
@@ -213,7 +203,7 @@ class OWFactorAnalysis(OWWidget):
         calculated_components = fa_rotation_result.components_
 
         # transform the table back to Orange.data.Table
-        self.fa_loadings = Table.from_numpy(Domain(self.attributes),
+        self.fa_loadings = Table.from_numpy(Domain(self.dataset.domain.attributes),
                                       calculated_components)
 
     def factor_analysis2(self):
