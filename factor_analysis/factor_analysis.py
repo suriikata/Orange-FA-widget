@@ -30,12 +30,13 @@ TVORNICA IZBOLJŠAV:
 """
 BorderRole = next(gui.OrangeUserRole)
 
+# user selects type of rotation
 class Rotation:
-    NoRotation, Varimax, Quartimax = 0, 1, 2
+    NoRotation, Varimax, Promax, Oblimin, Oblimax, Quartimin, Quartimax, Equamax = 0, 1, 2, 3, 4, 5, 6, 7
 
     @staticmethod
     def items():
-        return ["NoRotation", "Varimax", "Quartimax"]
+        return ["NoRotation", "Varimax", "Promax", "Oblimin", "Oblimax", "Quartimin", "Quartimax", "Equamax"]
 
 class OWFactorAnalysis(OWWidget):
     name = "Factor Analysis"
@@ -191,26 +192,28 @@ class OWFactorAnalysis(OWWidget):
 
     def factor_analysis(self):              #GROMOZANSKI, V OČI BODEČ HROŠČ
         # with chosen n_components and depending on the user-selected rotation, calculate the FA on self.dataset
-        if self.rotation == Rotation.NoRotation:
-            fa = FactorAnalysis(self.n_components)
-        elif self.rotation == Rotation.Varimax:
-            fa = FactorAnalysis(self.n_components, rotation="varimax")
-        else:
-            fa = FactorAnalysis(self.n_components, rotation="quartimax")
-        fa_rotation_result = fa.fit(self.dataset.X)
+        rotation = [None, "Varimax", "Promax", "Oblimin", "Oblimax", "Quartimin", "Quartimax", "Equamax"][self.rotation]
+        fit_result = FactorAnalyzer(rotation=rotation, n_factors=self.n_components).fit(self.dataset.X)
+
+        # from result variable (instance of FactorAnalyzer class) only extract the loadings
+        loadings = fit_result.loadings_
+
+        # transform loadings in listicic
+        loadings_list = []
+        for x in loadings:
+            loadings_list.append(x[0])
+
+        loadings_list = np.asarray(loadings_list) # transform into nupmy array (maybe not necessry)
+        print(f"len: {len(loadings_list)}, list of loadings: {loadings_list}")
+
+        # from result variable (instance of FactorAnalyzer class) get the eigenvalues
+        eigen_values = fit_result.get_eigenvalues()
+
     
-        # from result variable (instance of class) only extract the table we are interested in (components)
-        calculated_components = fa_rotation_result.components_
+       # transform the table back to Orange.data.Table
+        print(f": X shape 1: {self.dataset.X[1]} <--> {len(self.dataset.domain.attributes)} domain attributes")
 
-        # transform the table back to Orange.data.Table
-        self.fa_loadings = Table.from_numpy(Domain(self.dataset.domain.attributes),
-                                      calculated_components)
-
-    def factor_analysis2(self):
-        fa = FactorAnalyzer(rotation = None, n_factors = self.n_components)
-        fa.fit(self.dataset.X)
-        eigen = fa.get_eigenvalues()
-        print(eigen)
+        self.fa_loadings = Table.from_numpy(Domain(self.dataset.domain.attributes), loadings_list)
 
     @gui.deferred
     def commit(self):
@@ -218,7 +221,6 @@ class OWFactorAnalysis(OWWidget):
             self.Outputs.sample.send(None)
         else:
             self.factor_analysis()
-            self.factor_analysis2()
             # send self.fa_loadings in Outputs channel
             self.Outputs.sample.send(self.fa_loadings)
             self.insert_table()
