@@ -20,9 +20,9 @@ from pyqtgraph import mkPen, TextItem
 
 """
 TVORNICA IZBOLJŠAV:
-    i. aplicirati rotation funkcijo >>>> vrednosti se spremenijo le z COMMITOM; 
+    i. aplicirati rotation funkcijo >>>> vrednosti se spremenijo le s COMMITOM; 
     ii. correlation matrix z radiobutonni (OW Continuize) + prikazati na grafu;
-    iii. kot zmanjšamo število komponent te v tabeli ne izginejo;
+    iii. ko zmanjšamo število faktorjev, le-ti v tabeli NE izginejo;
     iv. obarvati in poudariti pomembne variable;
     v. definirati errorje;
     vi. izhajati iz plotutils namesto slidergrapha razreda;
@@ -30,7 +30,7 @@ TVORNICA IZBOLJŠAV:
 """
 BorderRole = next(gui.OrangeUserRole)
 
-# user selects type of rotation
+# user selects type of rotation.
 class Rotation:
     NoRotation, Varimax, Promax, Oblimin, Oblimax, Quartimin, Quartimax, Equamax = 0, 1, 2, 3, 4, 5, 6, 7
 
@@ -60,6 +60,7 @@ class OWFactorAnalysis(OWWidget):
         self.dataset = None     # this contains the input dataset.
         self.attributes = []    # this contains the list of attribute (variable) names.
         self.fa_loadings = None # this contains factorial values after rotation was applied.
+        self.eigen_values = None
 
         # Main area settings
         self.attr_box = gui.hBox(self.mainArea, margin=0)
@@ -83,9 +84,9 @@ class OWFactorAnalysis(OWWidget):
 
         gui.separator(self.mainArea)
 
-        box = gui.vBox(self.mainArea, box = "Factor Loadings")
 
         # Table
+        box = gui.vBox(self.mainArea, box = "Factor Loadings")
         self.tablemodel = QStandardItemModel(self)
         view = self.tableview = QTableView(
             editTriggers=QTableView.NoEditTriggers)
@@ -113,13 +114,13 @@ class OWFactorAnalysis(OWWidget):
     def set_data(self, dataset):
         self.dataset = dataset
 
-        # Extract list of attribute (variables) names from the self.dataset.domain.attributes
+        # extract list of attribute (variables) names from the self.dataset.domain.attributes.
         self.attributes = []
         for j in range(len(self.dataset.domain.attributes)):
             self.attributes.append(self.dataset.domain.attributes[j].name)
         self.commit.now()
 
-    # insert item into row i and column j of the table.
+    # insert item into row i and column j of the table
     def insert_item(self, i, j, val):
         # col_val = colors[i, j]                # at some point, color it by the relevance
         item = QStandardItem()
@@ -139,20 +140,27 @@ class OWFactorAnalysis(OWWidget):
         item.setData(val, Qt.DisplayRole)          # set our val into item
         self.tablemodel.setItem(i, j, item)
 
-    #set up the table which will be shown in the Main Area.
+    # set up the table which will be shown in the Main Area.
     def insert_table(self):
-        #insert attribute (variable) names into horizontal header
-        self.tablemodel.setHorizontalHeaderLabels(self.attributes)
+        # insert attribute (variable) names into horizontal header.
+        hheader_labels = ["eigenvalues",]
+        for att in self.attributes:
+            hheader_labels.append(att)
+        self.tablemodel.setHorizontalHeaderLabels(hheader_labels)
 
-        # TODO insert radiobox buttons
+        # insert radiobox buttons.
 
-        #TODO insert eigen values
+        # insert eigen values.
+        for factor in range(len(self.fa_loadings.X)):
+            eigen = self.eigen_values[factor]
+            self.insert_item(factor, 0, eigen)
 
-        #insert values into the table
+
+        # insert values into the table.
         for i in range(len(self.fa_loadings.X)):         #i = rows = factors
             for j in range(len(self.fa_loadings.X[0])):  #j = columns = variables
                 val = self.fa_loadings.X[i][j]           #from i-row and j-column we had a specific variable value
-                self.insert_item(i, j, val)      #insert into rows and column from 1 onwards, because everything is full of names
+                self.insert_item(i, j + 1, val)          #insert into rows and column from 1 onwards, because of the first eigen row
 
 
     def setup_plot(self):
@@ -160,17 +168,17 @@ class OWFactorAnalysis(OWWidget):
         if self.n_components == 1:
             return
 
-        #get first 2 factors to show on the graph
+        # get first 2 factors to show on the graph.
         self.factor1 = self.fa_loadings.X[0]
         self.factor2 = self.fa_loadings.X[1]
 
-        #gset the range
+        # set the range
         self.set_range_graph()
 
         foreground = self.plot.palette().text().color()
         foreground.setAlpha(128)
 
-        #draw the variable vectors and their names into the graph
+        # draw the variable vectors and their names into the graph.
         for x, y, attr_name in zip(self.factor1, self.factor2, self.attributes):
             x_vector, y_vector = [0, x], [0, y]
             self.plot.plot(x_vector, y_vector,
@@ -191,29 +199,24 @@ class OWFactorAnalysis(OWWidget):
 
 
     def factor_analysis(self):              #GROMOZANSKI, V OČI BODEČ HROŠČ
-        # with chosen n_components and depending on the user-selected rotation, calculate the FA on self.dataset
+        # with chosen n_components and depending on the user-selected rotation, calculate the FA on self.dataset.
         rotation = [None, "Varimax", "Promax", "Oblimin", "Oblimax", "Quartimin", "Quartimax", "Equamax"][self.rotation]
         fit_result = FactorAnalyzer(rotation=rotation, n_factors=self.n_components).fit(self.dataset.X)
 
-        # from result variable (instance of FactorAnalyzer class) only extract the loadings
-        loadings = fit_result.loadings_
-        
-        print(f"loadings: {loadings}")
-
-        # transform loadings in listicic
-        mega_loadings_list = []
+        # transform loadings correct format.
+        loadings = []
         for i in range(self.n_components):
-            loadings_list = []
-            for x in loadings:
-                loadings_list.append(x[i])
-            mega_loadings_list.append(loadings_list)
+            row = []
+            for x in fit_result.loadings_:
+                row.append(x[i])
+            loadings.append(row)
 
-        # from result variable (instance of FactorAnalyzer class) get the eigenvalues
-        eigen_values = fit_result.get_eigenvalues()
-
+        # from result variable (instance of FactorAnalyzer class) get the eigenvalues.
+        self.eigen_values = fit_result.get_eigenvalues()
+        self.eigen_values = self.eigen_values[0]             #take only the first of 2 arrays TODO why 2
     
-       # transform the table back to Orange.data.Table
-        self.fa_loadings = Table.from_numpy(Domain(self.dataset.domain.attributes), mega_loadings_list)
+       # transform the table back to Orange.data.Table.
+        self.fa_loadings = Table.from_numpy(Domain(self.dataset.domain.attributes), loadings)
 
     @gui.deferred
     def commit(self):
