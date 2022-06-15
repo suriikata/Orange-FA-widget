@@ -5,7 +5,7 @@ from factor_analyzer import FactorAnalyzer
 
 from AnyQt.QtCore import Qt
 from AnyQt.QtGui import QColor, QBrush, QStandardItemModel, QStandardItem
-from AnyQt.QtWidgets import QTableView, QSizePolicy
+from AnyQt.QtWidgets import QTableView, QSizePolicy, QGridLayout
 
 from Orange.data import Table, Domain
 from Orange.data.util import get_unique_names
@@ -21,7 +21,7 @@ from pyqtgraph import mkPen, TextItem
 """
 TVORNICA IZBOLJŠAV:
     i. aplicirati rotation funkcijo >>>> vrednosti se spremenijo le s COMMITOM; 
-    ii. correlation matrix z radiobutonni (OW Continuize) + prikazati na grafu;
+    ii. correlation matrix z radiobutonni (OW Kmeans) + prikazati na grafu;
     iii. ko zmanjšamo število faktorjev, le-ti v tabeli NE izginejo;
     iv. obarvati in poudariti pomembne variable;
     v. definirati errorje;
@@ -61,7 +61,8 @@ class OWFactorAnalysis(OWWidget):
         self.attributes = []    # this contains the list of attribute (variable) names.
         self.fa_loadings = None # this contains factorial values after rotation was applied.
         self.eigen_values = None
-
+        self.components_accumulation = [1]
+        
         # Main area settings
         self.attr_box = gui.hBox(self.mainArea, margin=0)
         
@@ -106,9 +107,22 @@ class OWFactorAnalysis(OWWidget):
         self.plot = SliderGraph("Factor 1", "Factor 2", lambda x: None)
         self.mainArea.layout().addWidget(self.plot)
 
+
     def n_components_changed(self):
+        self.components_accumulation.append(self.n_components)
+
         self.factor_analysis()
         self.commit.deferred()
+
+    # cleaning values in table after n_components was changed to a smaller value
+    def clear_table(self):
+        if len(self.components_accumulation) < 2:
+            return
+
+        prev_n_components = self.components_accumulation[-2]    
+        for i in range(prev_n_components):
+            for j in range(1 + len(self.fa_loadings.X[0])):     #1 column for eigen + number of variables.
+                self.insert_item(i, j, "")
 
     @Inputs.data
     def set_data(self, dataset):
@@ -140,6 +154,7 @@ class OWFactorAnalysis(OWWidget):
         item.setData(val, Qt.DisplayRole)          # set our val into item
         self.tablemodel.setItem(i, j, item)
 
+
     # set up the table which will be shown in the Main Area.
     def insert_table(self):
         # insert attribute (variable) names into horizontal header.
@@ -148,8 +163,25 @@ class OWFactorAnalysis(OWWidget):
             hheader_labels.append(att)
         self.tablemodel.setHorizontalHeaderLabels(hheader_labels)
 
-        # insert radiobox buttons.
+        # insert factor names into vertical header.
+        vheader_labels = []
+        for i in range(self.n_components):
+            vheader_labels.append(f"F{i + 1}")
+        self.tablemodel.setVerticalHeaderLabels(vheader_labels)
 
+        self.clear_table()
+
+        """
+        gumbna eksperimentizacija
+        # insert radiobox buttons.
+        layout = QGridLayout()
+        bg = gui.radioButtonsInBox(
+            self.mainArea, self, "n_components", orientation=layout,
+            box="Number of Components", callback=[],
+        )
+        layout.addWidget(gui.appendRadioButton(bg, "From", addToLayout=False), 2, 1)
+        """
+        
         # insert eigen values.
         for factor in range(len(self.fa_loadings.X)):
             eigen = self.eigen_values[factor]
@@ -160,7 +192,7 @@ class OWFactorAnalysis(OWWidget):
         for i in range(len(self.fa_loadings.X)):         #i = rows = factors
             for j in range(len(self.fa_loadings.X[0])):  #j = columns = variables
                 val = self.fa_loadings.X[i][j]           #from i-row and j-column we had a specific variable value
-                self.insert_item(i, j + 1, val)          #insert into rows and column from 1 onwards, because of the first eigen row
+                self.insert_item(i, j + 1, val)          #insert into columns from 1 onwards, because of the first eigen row
 
 
     def setup_plot(self):
