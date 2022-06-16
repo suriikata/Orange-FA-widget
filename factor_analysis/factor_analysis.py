@@ -3,9 +3,9 @@ import numpy as np
 from sklearn.decomposition import FactorAnalysis
 from factor_analyzer import FactorAnalyzer
 
-from AnyQt.QtCore import Qt
+from AnyQt.QtCore import Qt, QRectF
 from AnyQt.QtGui import QColor, QBrush, QStandardItemModel, QStandardItem
-from AnyQt.QtWidgets import QTableView, QSizePolicy, QGridLayout
+from AnyQt.QtWidgets import QTableView, QSizePolicy, QGridLayout,QHeaderView
 
 from Orange.data import Table, Domain
 from Orange.data.util import get_unique_names
@@ -24,7 +24,7 @@ TVORNICA IZBOLJŠAV:
     ii. correlation matrix z radiobutonni (OW Kmeans) + prikazati na grafu;
     iii. ko zmanjšamo število faktorjev, le-ti v tabeli NE izginejo;
     iv. obarvati in poudariti pomembne variable;
-    v. definirati errorje;
+    v. definirati errorje > ne moreš izbrat več faktorjev kot je spremenljivk;
     vi. izhajati iz plotutils namesto slidergrapha razreda;
     vii. input data: fa na sparse matrix.
 """
@@ -93,8 +93,10 @@ class OWFactorAnalysis(OWWidget):
             editTriggers=QTableView.NoEditTriggers)
         view.setModel(self.tablemodel)
         view.horizontalHeader()
+        view.horizontalHeader().setMinimumSectionSize(40)
         view.verticalHeader()
-        view.horizontalHeader().setMinimumSectionSize(60)
+        self.select2Header = Select2Header()
+        view.setVerticalHeader(self.select2Header)
         #view.selectionModel().selectionChanged.connect(self._invalidate)
         view.setShowGrid(True)
         #view.setItemDelegate(BorderedItemDelegate(Qt.white))
@@ -103,8 +105,9 @@ class OWFactorAnalysis(OWWidget):
         # view.clicked.connect(self.cell_clicked)
         box.layout().addWidget(view)
 
+
         # Graph
-        self.plot = SliderGraph("Factor 1", "Factor 2", lambda x: None)
+        self.plot = SliderGraph("", "", lambda x: None)
         self.mainArea.layout().addWidget(self.plot)
 
 
@@ -119,7 +122,7 @@ class OWFactorAnalysis(OWWidget):
         if len(self.components_accumulation) < 2:
             return
 
-        prev_n_components = self.components_accumulation[-2]    
+        prev_n_components = self.components_accumulation[-2]
         for i in range(prev_n_components):
             for j in range(1 + len(self.fa_loadings.X[0])):     #1 column for eigen + number of variables.
                 self.insert_item(i, j, "")
@@ -171,17 +174,6 @@ class OWFactorAnalysis(OWWidget):
 
         self.clear_table()
 
-        """
-        gumbna eksperimentizacija
-        # insert radiobox buttons.
-        layout = QGridLayout()
-        bg = gui.radioButtonsInBox(
-            self.mainArea, self, "n_components", orientation=layout,
-            box="Number of Components", callback=[],
-        )
-        layout.addWidget(gui.appendRadioButton(bg, "From", addToLayout=False), 2, 1)
-        """
-        
         # insert eigen values.
         for factor in range(len(self.fa_loadings.X)):
             eigen = self.eigen_values[factor]
@@ -196,13 +188,22 @@ class OWFactorAnalysis(OWWidget):
 
 
     def setup_plot(self):
+        print("klice se setup_plot")
         self.plot.clear_plot()
         if self.n_components == 1:
             return
 
-        # get first 2 factors to show on the graph.
-        self.factor1 = self.fa_loadings.X[0]
-        self.factor2 = self.fa_loadings.X[1]
+        selected_factors = self.select2Header.selected
+        print(f"izbrana: {selected_factors}")
+
+        self.factor1 = self.fa_loadings.X[selected_factors[0]]
+        self.factor2 = self.fa_loadings.X[selected_factors[1]]
+
+        # assign names to axis based on factors selected.
+        axis = self.plot.getAxis("bottom")
+        axis.setLabel(f"Factor {selected_factors[0]}")
+        axis = self.plot.getAxis("left")
+        axis.setLabel(f"Factor {selected_factors[1]}")
 
         # set the range
         self.set_range_graph()
@@ -229,7 +230,6 @@ class OWFactorAnalysis(OWWidget):
         factor2_range = np.max(1.1 * np.abs(self.factor2))
         self.plot.setRange(xRange=(-factor1_range, factor1_range), yRange=(-factor2_range, factor2_range))
 
-
     def factor_analysis(self):              #GROMOZANSKI, V OČI BODEČ HROŠČ
         # with chosen n_components and depending on the user-selected rotation, calculate the FA on self.dataset.
         rotation = [None, "Varimax", "Promax", "Oblimin", "Oblimax", "Quartimin", "Quartimax", "Equamax"][self.rotation]
@@ -245,7 +245,7 @@ class OWFactorAnalysis(OWWidget):
 
         # from result variable (instance of FactorAnalyzer class) get the eigenvalues.
         self.eigen_values = fit_result.get_eigenvalues()
-        self.eigen_values = self.eigen_values[0]             #take only the first of 2 arrays TODO why 2
+        self.eigen_values = self.eigen_values[0]             #take only the first of 2 arrays > TODO why 2
     
        # transform the table back to Orange.data.Table.
         self.fa_loadings = Table.from_numpy(Domain(self.dataset.domain.attributes), loadings)
@@ -261,7 +261,42 @@ class OWFactorAnalysis(OWWidget):
             self.insert_table()
             self.setup_plot()
 
+class Select2Header(QHeaderView):
+    def __init__(self):
+        super().__init__(Qt.Vertical)
+        self.selected = [0, 1]
 
+        self.setSectionsClickable(True)
+        self.setSelectionMode(QHeaderView.NoSelection)
+        self.sectionClicked.connect(self._on_clicked)
+
+    def _on_clicked(self, i):
+        if i not in self.selected:
+            removed = self.selected.pop(0)
+            self.headerDataChanged(Qt.Vertical, removed, removed)
+            self.selected = [self.selected[0], i]
+        self.repaint()
+
+    def sizeHint(self):
+        size = super().sizeHint()
+        size.setWidth(size.width() + size.height())
+        return size
+
+    def paintSection(self, painter, rect, section):
+        painter.save()
+        super().paintSection(painter, rect, section)
+        painter.restore()
+        painter.save()
+        x, y = rect.x(), rect.y()
+        w, h = rect.width(), rect.height()
+        a = h * 0.4
+        x += w - 1.5 * a
+        y += (h - a) // 2
+        painter.drawRoundedRect(QRectF(x, y, a, a), 2, 2)
+        if section in self.selected:
+            painter.setBrush(QBrush(painter.pen().color()))
+            painter.drawRect(QRectF(x + a / 4, y + a / 4, a / 2, a / 2))
+        painter.restore()
 
 if __name__ == "__main__":
     WidgetPreview(OWFactorAnalysis).run(Table("iris"))
