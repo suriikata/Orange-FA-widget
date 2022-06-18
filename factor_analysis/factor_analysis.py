@@ -7,12 +7,14 @@ from AnyQt.QtCore import Qt, QRectF
 from AnyQt.QtGui import QColor, QBrush, QStandardItemModel, QStandardItem
 from AnyQt.QtWidgets import QTableView, QSizePolicy, QGridLayout,QHeaderView
 
-from Orange.data import Table, Domain
+from Orange.data import Table, Domain, DiscreteVariable
 from Orange.data.util import get_unique_names
 from Orange.widgets import settings
 from Orange.widgets.widget import OWWidget
 from orangewidget.widget import Input, Output
 from orangewidget.utils.widgetpreview import WidgetPreview
+from orangewidget.utils.itemmodels import PyListModel
+from Orange.widgets.utils.itemmodels import DomainModel
 from Orange.widgets.utils.slidergraph import SliderGraph
 from orangewidget import gui
 
@@ -38,6 +40,8 @@ class Rotation:
     def items():
         return ["NoRotation", "Varimax", "Promax", "Oblimin", "Oblimax", "Quartimin", "Quartimax", "Equamax"]
 
+
+
 class OWFactorAnalysis(OWWidget):
     name = "Factor Analysis"
     description = "Randomly selects a subset of instances from the dataset."
@@ -54,6 +58,8 @@ class OWFactorAnalysis(OWWidget):
 
     n_components = settings.ContextSetting(1)
     rotation = settings.Setting(Rotation.NoRotation)
+    #axis_plot = settings.ContextSetting(None)
+    axis_plot = ""
     autocommit = settings.Setting(True)
     
     def __init__(self):
@@ -62,7 +68,7 @@ class OWFactorAnalysis(OWWidget):
         self.fa_loadings = None # this contains factorial values after rotation was applied.
         self.eigen_values = None
         self.components_accumulation = [1]
-        
+
         # Main area settings
         self.attr_box = gui.hBox(self.mainArea, margin=0)
         
@@ -85,7 +91,6 @@ class OWFactorAnalysis(OWWidget):
 
         gui.separator(self.mainArea)
 
-
         # Table
         box = gui.vBox(self.mainArea, box = "Factor Loadings")
         self.tablemodel = QStandardItemModel(self)
@@ -105,6 +110,23 @@ class OWFactorAnalysis(OWWidget):
         # view.clicked.connect(self.cell_clicked)
         box.layout().addWidget(view)
 
+        gui.separator(self.mainArea)
+
+        self.axis_box = gui.hBox(self.mainArea, box = "Graph Settings")
+        self.axis_value_model = PyListModel()
+        x_axis = gui.comboBox(
+            self.axis_box, self, "axis_plot", label="X-axis:", labelWidth=50,
+            model=self.axis_value_model, orientation=Qt.Horizontal,
+            contentsLength=5, callback=self.n_components_changed
+        )
+        """
+        y_axis = gui.comboBox(
+            self.axis_box, self, "rotation", label="Y-axis:", labelWidth=50,
+            items=Rotation.items(), orientation=Qt.Horizontal,
+            contentsLength=5, callback=self.factor_analysis
+        )
+        """
+
 
         # Graph
         self.plot = SliderGraph("", "", lambda x: None)
@@ -115,6 +137,12 @@ class OWFactorAnalysis(OWWidget):
         self.components_accumulation.append(self.n_components)
 
         self.factor_analysis()
+
+        axis_values = []
+        for v in range(self.n_components):
+            axis_values.append(str(v))
+        self.axis_value_model[:] = axis_values
+
         self.commit.deferred()
 
     # cleaning values in table after n_components was changed to a smaller value
@@ -130,6 +158,7 @@ class OWFactorAnalysis(OWWidget):
     @Inputs.data
     def set_data(self, dataset):
         self.dataset = dataset
+        #self.axis_model.set_domain(dataset.domain)
 
         # extract list of attribute (variables) names from the self.dataset.domain.attributes.
         self.attributes = []
