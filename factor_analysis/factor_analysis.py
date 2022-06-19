@@ -22,9 +22,9 @@ from pyqtgraph import mkPen, TextItem
 
 """
 TVORNICA IZBOLJŠAV:
-    i. aplicirati rotation funkcijo >>>> vrednosti se spremenijo le s COMMITOM; 
-    ii. correlation matrix z radiobutonni (OW Kmeans) + prikazati na grafu;
-    iii. ko zmanjšamo število faktorjev, le-ti v tabeli NE izginejo;
+    i. switch button pri izbiri koordinat na grafu;
+    ii. ko zmanjšamo število komponent, odstraniti prazne vrstice;
+    iii. dodati vrstico s communality in varianco;
     iv. obarvati in poudariti pomembne variable;
     v. definirati errorje > ne moreš izbrat več faktorjev kot je spremenljivk;
     vi. izhajati iz plotutils namesto slidergrapha razreda;
@@ -58,8 +58,8 @@ class OWFactorAnalysis(OWWidget):
 
     n_components = settings.ContextSetting(1)
     rotation = settings.Setting(Rotation.NoRotation)
-    #axis_plot = settings.ContextSetting(None)
-    axis_plot = ""
+    x_axis_setting = 0
+    y_axis_setting = 0
     autocommit = settings.Setting(True)
     
     def __init__(self):
@@ -81,7 +81,7 @@ class OWFactorAnalysis(OWWidget):
         gui.comboBox(
             self.attr_box, self, "rotation", label="Rotation:", labelWidth=50,
             items=Rotation.items(), orientation=Qt.Horizontal, 
-            contentsLength=12, callback=self.factor_analysis
+            contentsLength=12, callback=self.n_components_changed
         )
 
         gui.auto_commit(
@@ -99,9 +99,6 @@ class OWFactorAnalysis(OWWidget):
         view.setModel(self.tablemodel)
         view.horizontalHeader()
         view.horizontalHeader().setMinimumSectionSize(40)
-        view.verticalHeader()
-        self.select2Header = Select2Header()
-        view.setVerticalHeader(self.select2Header)
         #view.selectionModel().selectionChanged.connect(self._invalidate)
         view.setShowGrid(True)
         #view.setItemDelegate(BorderedItemDelegate(Qt.white))
@@ -113,20 +110,19 @@ class OWFactorAnalysis(OWWidget):
         gui.separator(self.mainArea)
 
         self.axis_box = gui.hBox(self.mainArea, box = "Graph Settings")
-        self.axis_value_model = PyListModel()
+        self.axis_value_model_x = PyListModel(iterable=[0])
         x_axis = gui.comboBox(
-            self.axis_box, self, "axis_plot", label="X-axis:", labelWidth=50,
-            model=self.axis_value_model, orientation=Qt.Horizontal,
-            contentsLength=5, callback=self.n_components_changed
+            self.axis_box, self, "x_axis_setting", label="X-axis:", labelWidth=50,
+            model=self.axis_value_model_x, orientation=Qt.Horizontal,
+            contentsLength=5, callback=self.axis_graph_settings
         )
-        """
-        y_axis = gui.comboBox(
-            self.axis_box, self, "rotation", label="Y-axis:", labelWidth=50,
-            items=Rotation.items(), orientation=Qt.Horizontal,
-            contentsLength=5, callback=self.factor_analysis
-        )
-        """
 
+        self.axis_value_model_y = PyListModel(iterable=[0])
+        y_axis = gui.comboBox(
+            self.axis_box, self, "y_axis_setting", label="Y-axis:", labelWidth=50,
+            model=self.axis_value_model_y, orientation=Qt.Horizontal,
+            contentsLength=5, callback=self.axis_graph_settings
+        )
 
         # Graph
         self.plot = SliderGraph("", "", lambda x: None)
@@ -135,14 +131,8 @@ class OWFactorAnalysis(OWWidget):
 
     def n_components_changed(self):
         self.components_accumulation.append(self.n_components)
-
         self.factor_analysis()
-
-        axis_values = []
-        for v in range(self.n_components):
-            axis_values.append(str(v))
-        self.axis_value_model[:] = axis_values
-
+        self.axis_graph_settings()
         self.commit.deferred()
 
     # cleaning values in table after n_components was changed to a smaller value
@@ -216,14 +206,34 @@ class OWFactorAnalysis(OWWidget):
                 self.insert_item(i, j + 1, val)          #insert into columns from 1 onwards, because of the first eigen row
 
 
-    def setup_plot(self):
-        print("klice se setup_plot")
-        self.plot.clear_plot()
-        if self.n_components == 1:
+    def axis_graph_settings(self):
+        if self.n_components < 2:
             return
 
-        selected_factors = self.select2Header.selected
-        print(f"izbrana: {selected_factors}")
+        x_axis_list = [self.x_axis_setting]
+        for i in range(self.n_components):
+            if i != self.x_axis_setting:
+                x_axis_list.append(i)
+
+        self.axis_value_model_x[:] = x_axis_list
+
+        y_axis_list = [self.y_axis_setting]
+        for i in range(self.n_components):
+            if i != self.y_axis_setting:
+                y_axis_list.append(i)
+
+        self.axis_value_model_y[:] = y_axis_list
+
+        if  max(self.x_axis_setting, self.y_axis_setting) >= self.n_components:
+            return
+
+        self.setup_plot()
+
+
+    def setup_plot(self):
+        self.plot.clear_plot()
+
+        selected_factors = [self.x_axis_setting, self.y_axis_setting]
 
         self.factor1 = self.fa_loadings.X[selected_factors[0]]
         self.factor2 = self.fa_loadings.X[selected_factors[1]]
@@ -288,44 +298,6 @@ class OWFactorAnalysis(OWWidget):
             # send self.fa_loadings in Outputs channel
             self.Outputs.sample.send(self.fa_loadings)
             self.insert_table()
-            self.setup_plot()
-
-class Select2Header(QHeaderView):
-    def __init__(self):
-        super().__init__(Qt.Vertical)
-        self.selected = [0, 1]
-
-        self.setSectionsClickable(True)
-        self.setSelectionMode(QHeaderView.NoSelection)
-        self.sectionClicked.connect(self._on_clicked)
-
-    def _on_clicked(self, i):
-        if i not in self.selected:
-            removed = self.selected.pop(0)
-            self.headerDataChanged(Qt.Vertical, removed, removed)
-            self.selected = [self.selected[0], i]
-        self.repaint()
-
-    def sizeHint(self):
-        size = super().sizeHint()
-        size.setWidth(size.width() + size.height())
-        return size
-
-    def paintSection(self, painter, rect, section):
-        painter.save()
-        super().paintSection(painter, rect, section)
-        painter.restore()
-        painter.save()
-        x, y = rect.x(), rect.y()
-        w, h = rect.width(), rect.height()
-        a = h * 0.4
-        x += w - 1.5 * a
-        y += (h - a) // 2
-        painter.drawRoundedRect(QRectF(x, y, a, a), 2, 2)
-        if section in self.selected:
-            painter.setBrush(QBrush(painter.pen().color()))
-            painter.drawRect(QRectF(x + a / 4, y + a / 4, a / 2, a / 2))
-        painter.restore()
 
 if __name__ == "__main__":
     WidgetPreview(OWFactorAnalysis).run(Table("iris"))
