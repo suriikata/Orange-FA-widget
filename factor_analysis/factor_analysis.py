@@ -41,7 +41,6 @@ class Rotation:
         return ["NoRotation", "Varimax", "Promax", "Oblimin", "Oblimax", "Quartimin", "Quartimax", "Equamax"]
 
 
-
 class OWFactorAnalysis(OWWidget):
     name = "Factor Analysis"
     description = "Randomly selects a subset of instances from the dataset."
@@ -58,8 +57,8 @@ class OWFactorAnalysis(OWWidget):
 
     n_components = settings.ContextSetting(1)
     rotation = settings.Setting(Rotation.NoRotation)
-    x_axis_setting = 0
-    y_axis_setting = 0
+    x_axis_setting = 1
+    y_axis_setting = 1
     autocommit = settings.Setting(True)
     
     def __init__(self):
@@ -110,14 +109,14 @@ class OWFactorAnalysis(OWWidget):
         gui.separator(self.mainArea)
 
         self.axis_box = gui.hBox(self.mainArea, box = "Graph Settings")
-        self.axis_value_model_x = PyListModel(iterable=[0])
+        self.axis_value_model_x = PyListModel(iterable=[self.x_axis_setting])
         x_axis = gui.comboBox(
             self.axis_box, self, "x_axis_setting", label="X-axis:", labelWidth=50,
             model=self.axis_value_model_x, orientation=Qt.Horizontal,
             contentsLength=5, callback=self.axis_graph_settings
         )
 
-        self.axis_value_model_y = PyListModel(iterable=[0])
+        self.axis_value_model_y = PyListModel(iterable=[self.y_axis_setting])
         y_axis = gui.comboBox(
             self.axis_box, self, "y_axis_setting", label="Y-axis:", labelWidth=50,
             model=self.axis_value_model_y, orientation=Qt.Horizontal,
@@ -135,7 +134,7 @@ class OWFactorAnalysis(OWWidget):
         self.axis_graph_settings()
         self.commit.deferred()
 
-    # cleaning values in table after n_components was changed to a smaller value
+    # cleaning values in table after n_components was changed to a smaller value.
     def clear_table(self):
         if len(self.components_accumulation) < 2:
             return
@@ -148,7 +147,7 @@ class OWFactorAnalysis(OWWidget):
     @Inputs.data
     def set_data(self, dataset):
         self.dataset = dataset
-        #self.axis_model.set_domain(dataset.domain)
+        # self.axis_model.set_domain(dataset.domain)
 
         # extract list of attribute (variables) names from the self.dataset.domain.attributes.
         self.attributes = []
@@ -211,20 +210,23 @@ class OWFactorAnalysis(OWWidget):
             return
 
         x_axis_list = [self.x_axis_setting]
-        for i in range(self.n_components):
+        for i in range(1, self.n_components + 1):
             if i != self.x_axis_setting:
                 x_axis_list.append(i)
 
+
         self.axis_value_model_x[:] = x_axis_list
 
+
         y_axis_list = [self.y_axis_setting]
-        for i in range(self.n_components):
+        for i in range(1, self.n_components + 1):
             if i != self.y_axis_setting:
                 y_axis_list.append(i)
 
         self.axis_value_model_y[:] = y_axis_list
 
-        if  max(self.x_axis_setting, self.y_axis_setting) >= self.n_components:
+        # reset when max value of axis setting exceeds n_components.
+        if  max(self.x_axis_setting, self.y_axis_setting) >= self.n_components + 1:
             return
 
         self.setup_plot()
@@ -233,16 +235,16 @@ class OWFactorAnalysis(OWWidget):
     def setup_plot(self):
         self.plot.clear_plot()
 
-        selected_factors = [self.x_axis_setting, self.y_axis_setting]
-
-        self.factor1 = self.fa_loadings.X[selected_factors[0]]
-        self.factor2 = self.fa_loadings.X[selected_factors[1]]
+        # i want the graph axis selection combo box to start from 1
+        # but i want factor 1 to correspond to first row in the table - row with index 0.
+        self.factor1 = self.fa_loadings.X[self.x_axis_setting - 1]
+        self.factor2 = self.fa_loadings.X[self.y_axis_setting - 1]
 
         # assign names to axis based on factors selected.
         axis = self.plot.getAxis("bottom")
-        axis.setLabel(f"Factor {selected_factors[0]}")
+        axis.setLabel(f"Factor {self.x_axis_setting}")
         axis = self.plot.getAxis("left")
-        axis.setLabel(f"Factor {selected_factors[1]}")
+        axis.setLabel(f"Factor {self.y_axis_setting}")
 
         # set the range
         self.set_range_graph()
