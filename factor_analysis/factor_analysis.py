@@ -144,6 +144,9 @@ class OWFactorAnalysis(OWWidget):
             for j in range(1 + len(self.fa_loadings.X[0])):     #1 column for eigen + number of variables.
                 self.insert_item(i, j, "")
 
+        self.tablemodel.removeRows(self.n_components, prev_n_components - self.n_components)
+
+
     @Inputs.data
     def set_data(self, dataset):
         self.dataset = dataset
