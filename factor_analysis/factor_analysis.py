@@ -22,8 +22,8 @@ from pyqtgraph import mkPen, TextItem
 
 """
 TVORNICA IZBOLJŠAV:
-    i. switch button pri izbiri koordinat na grafu;
-    ii. ko zmanjšamo število komponent, odstraniti prazne vrstice;
+    i. switch button pri izbiri koordinat na grafu + zoom in/out + 3d rotacija komponent;
+    ii. omejitev števila vnosnih podatkov;
     iii. dodati vrstico s communality in varianco;
     iv. obarvati in poudariti pomembne variable;
     v. definirati errorje > ne moreš izbrat več faktorjev kot je spremenljivk;
@@ -67,6 +67,7 @@ class OWFactorAnalysis(OWWidget):
         self.fa_loadings = None # this contains factorial values after rotation was applied.
         self.eigen_values = None
         self.components_accumulation = [1]
+        self.communalities = None
 
         # Main area settings
         self.attr_box = gui.hBox(self.mainArea, margin=0)
@@ -182,13 +183,13 @@ class OWFactorAnalysis(OWWidget):
     # set up the table which will be shown in the Main Area.
     def insert_table(self):
         # insert attribute (variable) names into horizontal header.
-        hheader_labels = ["eigenvalues",]
+        hheader_labels = ["eigenvalue",]
         for att in self.attributes:
             hheader_labels.append(att)
         self.tablemodel.setHorizontalHeaderLabels(hheader_labels)
 
         # insert factor names into vertical header.
-        vheader_labels = []
+        vheader_labels = ["communalities",]
         for i in range(self.n_components):
             vheader_labels.append(f"F{i + 1}")
         self.tablemodel.setVerticalHeaderLabels(vheader_labels)
@@ -198,14 +199,18 @@ class OWFactorAnalysis(OWWidget):
         # insert eigen values.
         for factor in range(len(self.fa_loadings.X)):
             eigen = self.eigen_values[factor]
-            self.insert_item(factor, 0, eigen)
+            self.insert_item(factor + 1, 0, eigen)
 
+        # insert communalities in the first row.
+        for j in range(len(self.fa_loadings.X[0])):
+            val = self.communalities[j]
+            self.insert_item(0, j + 1, val)
 
         # insert values into the table.
         for i in range(len(self.fa_loadings.X)):         #i = rows = factors
             for j in range(len(self.fa_loadings.X[0])):  #j = columns = variables
                 val = self.fa_loadings.X[i][j]           #from i-row and j-column we had a specific variable value
-                self.insert_item(i, j + 1, val)          #insert into columns from 1 onwards, because of the first eigen row
+                self.insert_item(i + 1, j + 1, val)      #insert into columns from 1 onwards, because of the first eigen row
 
 
     def axis_graph_settings(self):
@@ -238,7 +243,7 @@ class OWFactorAnalysis(OWWidget):
     def setup_plot(self):
         self.plot.clear_plot()
 
-        # i want the graph axis selection combo box to start from 1
+        # i want the graph axis selection combo box to start from 1,
         # but i want factor 1 to correspond to first row in the table - row with index 0.
         self.factor1 = self.fa_loadings.X[self.x_axis_setting - 1]
         self.factor2 = self.fa_loadings.X[self.y_axis_setting - 1]
@@ -249,7 +254,7 @@ class OWFactorAnalysis(OWWidget):
         axis = self.plot.getAxis("left")
         axis.setLabel(f"Factor {self.y_axis_setting}")
 
-        # set the range
+        # set the range.
         self.set_range_graph()
 
         foreground = self.plot.palette().text().color()
@@ -277,18 +282,23 @@ class OWFactorAnalysis(OWWidget):
     def factor_analysis(self):              #GROMOZANSKI, V OČI BODEČ HROŠČ
         # with chosen n_components and depending on the user-selected rotation, calculate the FA on self.dataset.
         rotation = [None, "Varimax", "Promax", "Oblimin", "Oblimax", "Quartimin", "Quartimax", "Equamax"][self.rotation]
-        fit_result = FactorAnalyzer(rotation=rotation, n_factors=self.n_components).fit(self.dataset.X)
+        fa = FactorAnalyzer(rotation=rotation, n_factors=self.n_components)
+        fa.fit(self.dataset.X)
+
 
         # transform loadings correct format.
         loadings = []
         for i in range(self.n_components):
             row = []
-            for x in fit_result.loadings_:
+            for x in fa.loadings_:
                 row.append(x[i])
             loadings.append(row)
 
+        self.communalities = fa.get_communalities()
+        print(self.communalities)
+
         # from result variable (instance of FactorAnalyzer class) get the eigenvalues.
-        self.eigen_values = fit_result.get_eigenvalues()
+        self.eigen_values = fa.get_eigenvalues()
         self.eigen_values = self.eigen_values[0]             #take only the first of 2 arrays > TODO why 2
     
        # transform the table back to Orange.data.Table.
